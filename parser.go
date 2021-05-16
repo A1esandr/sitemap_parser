@@ -62,8 +62,13 @@ func (p *Parser) Parse() {
 	sort.SliceStable(urls, func(i, j int) bool {
 		return urls[i].LastMod < urls[j].LastMod
 	})
+	c := make(chan struct{}, 10)
+	for i := 0; i < 10; i++ {
+		c <- struct{}{}
+	}
 	var wg sync.WaitGroup
 	for i, v := range urls {
+		<-c
 		wg.Add(1)
 		go func(url string, i int) {
 			fmt.Println(url)
@@ -74,6 +79,7 @@ func (p *Parser) Parse() {
 			}
 			urls[i].Title = p.parse(doc)
 			wg.Done()
+			c <- struct{}{}
 		}(v.Loc, i)
 	}
 	wg.Wait()
