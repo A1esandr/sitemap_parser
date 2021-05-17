@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/xml"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -32,7 +33,10 @@ type (
 	}
 )
 
+var site = flag.String("site", "", "URL of the site, for example, http://example.com")
+
 func main() {
+	flag.Parse()
 	New().Parse()
 }
 
@@ -43,7 +47,10 @@ func New() *Parser {
 func (p *Parser) Parse() {
 	url := os.Getenv("SITE")
 	if len(url) == 0 {
-		log.Fatal("no site url env found")
+		url = *site
+	}
+	if len(url) == 0 {
+		log.Fatal("no site url found")
 	}
 	if !(strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://")) {
 		log.Fatal("site url must starts from http:// or https://")
