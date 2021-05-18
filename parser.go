@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -18,6 +19,7 @@ import (
 
 type (
 	Parser struct {
+		backupPath string
 	}
 
 	URLSet struct {
@@ -33,7 +35,8 @@ type (
 	}
 )
 
-var site = flag.String("site", "", "URL of the site, for example, http://example.com")
+var site = flag.String("site", "", "URL of the site, for example, https://alextech18.blogspot.com")
+var path = flag.String("backup", "", "backup path")
 
 func main() {
 	flag.Parse()
@@ -55,6 +58,17 @@ func (p *Parser) Parse() {
 	if !(strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://")) {
 		log.Fatal("site url must starts from http:// or https://")
 	}
+
+	backupPath := os.Getenv("BACKUP_PATH")
+	if len(backupPath) == 0 {
+		backupPath = *path
+	}
+
+	if len(backupPath) > 0 {
+		configurator := NewPathConfigurator()
+		p.backupPath = configurator.Configure(backupPath, url)
+	}
+
 	if !strings.HasSuffix(url, "/") {
 		url += "/"
 	}
@@ -80,6 +94,7 @@ func (p *Parser) Parse() {
 		go func(url string, i int) {
 			fmt.Println(url)
 			page := p.get(url)
+			p.backup(page, url)
 			doc, err := html.Parse(bytes.NewReader(page))
 			if err != nil {
 				log.Fatal(err)
@@ -143,4 +158,16 @@ func (p *Parser) printList(urls []URL) {
 	}
 	sb.WriteString("</ol>")
 	fmt.Println(sb.String())
+}
+
+func (p *Parser) backup(file []byte, url string) {
+	if len(p.backupPath) == 0 || !strings.HasSuffix(url, ".html") {
+		return
+	}
+	name := strings.ReplaceAll(url, "://", "")
+	name = strings.ReplaceAll(name, "/", "_")
+	err := ioutil.WriteFile(p.backupPath+name, file, 0644)
+	if err != nil {
+		panic(err)
+	}
 }
