@@ -15,6 +15,8 @@ import (
 	"sync"
 
 	"golang.org/x/net/html"
+
+	pth "github.com/A1esandr/sitemap_parser/internal/path"
 )
 
 type (
@@ -65,7 +67,7 @@ func (p *Parser) Parse() {
 	}
 
 	if len(backupPath) > 0 {
-		configurator := NewPathConfigurator()
+		configurator := pth.NewPathConfigurator()
 		p.backupPath = configurator.Configure(backupPath, url)
 	}
 
