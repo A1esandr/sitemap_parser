@@ -35,6 +35,16 @@ type (
 		LastMod string   `xml:"lastmod"`
 		Title   string
 	}
+
+	Sitemapindex struct {
+		XMLName xml.Name  `xml:"sitemapindex"`
+		Sitemap []Sitemap `xml:"sitemap"`
+	}
+
+	Sitemap struct {
+		XMLName xml.Name `xml:"sitemap"`
+		Loc     string   `xml:"loc"`
+	}
 )
 
 var site = flag.String("site", "", "URL of the site, for example, https://alextech18.blogspot.com")
@@ -76,12 +86,23 @@ func (p *Parser) Parse() {
 	}
 	url += "sitemap.xml"
 	data := p.get(url)
-	var urlset URLSet
-	err := xml.Unmarshal(data, &urlset)
-	if err != nil {
-		log.Fatalf("error parse response xml %s", err.Error())
+	var urls []URL
+
+	if strings.Contains(string(data), "<sitemapindex") {
+		var sitemapindex Sitemapindex
+		err := xml.Unmarshal(data, &sitemapindex)
+		if err != nil {
+			log.Fatalf("error parse response xml %s", err.Error())
+		}
+		for _, sitemap := range sitemapindex.Sitemap {
+			data = p.get(sitemap.Loc)
+			pageUrls := p.process(data)
+			urls = append(urls, pageUrls...)
+		}
+	} else {
+		urls = p.process(data)
 	}
-	urls := urlset.URL
+
 	sort.SliceStable(urls, func(i, j int) bool {
 		return urls[i].LastMod < urls[j].LastMod
 	})
@@ -108,6 +129,15 @@ func (p *Parser) Parse() {
 	}
 	wg.Wait()
 	p.printList(urls)
+}
+
+func (p *Parser) process(data []byte) []URL {
+	var urlset URLSet
+	err := xml.Unmarshal(data, &urlset)
+	if err != nil {
+		log.Fatalf("error parse response xml %s", err.Error())
+	}
+	return urlset.URL
 }
 
 func (p *Parser) get(url string) []byte {
