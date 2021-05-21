@@ -19,9 +19,17 @@ go run parser.go
 ### Settings
 
 #### Envs
-* **SITE** - URL of site with sitemal.xml, for example, https://alextech18.blogspot.com
-* **BACKUP_PATH** - path for backuping loaded website pages, for example, /home/A1esandr/backups
+Envs have precedence over command line args
+* **SITE** - (Required) URL of site with sitemal.xml, for example, https://alextech18.blogspot.com
+* **BACKUP_PATH** - (Optional) path for backuping loaded website pages, for example, /home/A1esandr/backups
 
 #### Command line args
-* **-site** - URL of site with sitemal.xml, for example, ```go run parser.go -site https://alextech18.blogspot.com```
-* **-backup** - path for backuping loaded website pages, for example, ```go run parser.go -site https://alextech18.blogspot.com -backup /home/A1esandr/backups```
+Command line args analized if envs are not present
+* **-site** - (Required, or existence of SITE env) URL of site with sitemal.xml, for example, 
+```
+go run parser.go -site https://alextech18.blogspot.com
+```
+* **-backup** - (Optional) path for backuping loaded website pages, for example, 
+```
+go run parser.go -site https://alextech18.blogspot.com -backup /home/A1esandr/backups
+```
