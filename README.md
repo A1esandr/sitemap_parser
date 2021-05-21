@@ -1,5 +1,8 @@
 # sitemap_parser
-Tool for parsing XML sitemap - to create list of all site pages. Prints list to console by defaults.
+Tool for parsing XML sitemap.
+* Creates list of all site pages. Prints list to console by defaults. 
+* Can execute backup of loaded pages if backup path provided.
+
 Expects site has sitemap.xml file, for example, https://alextech18.blogspot.com/sitemap.xml
 
 ### Prerequisites
