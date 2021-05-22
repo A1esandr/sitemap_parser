@@ -1,18 +1,19 @@
 package main
 
 import (
+	"archive/zip"
 	"bytes"
 	"encoding/xml"
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"golang.org/x/net/html"
 
@@ -22,6 +23,7 @@ import (
 type (
 	Parser struct {
 		backupPath string
+		data       map[string][]byte
 	}
 
 	URLSet struct {
@@ -56,7 +58,7 @@ func main() {
 }
 
 func New() *Parser {
-	return &Parser{}
+	return &Parser{data: make(map[string][]byte)}
 }
 
 func (p *Parser) Parse() {
@@ -128,6 +130,7 @@ func (p *Parser) Parse() {
 		}(v.Loc, i)
 	}
 	wg.Wait()
+	p.archive()
 	p.printList(urls)
 }
 
@@ -198,8 +201,44 @@ func (p *Parser) backup(file []byte, url string) {
 	}
 	name := strings.ReplaceAll(url, "://", "")
 	name = strings.ReplaceAll(name, "/", "_")
-	err := ioutil.WriteFile(p.backupPath+name, file, 0644)
+	err := os.WriteFile(p.backupPath+name, file, 0644)
 	if err != nil {
 		panic(err)
+	}
+	p.data[name] = file
+}
+
+func (p *Parser) archive() {
+	if len(p.backupPath) == 0 || len(p.data) == 0 {
+		return
+	}
+	t := time.Now()
+	zipFile := t.Format("2006-01-02") + "archive.zip"
+	out, err := os.Create(p.backupPath + zipFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() {
+		closeErr := out.Close()
+		if closeErr != nil {
+			log.Fatalf("error close %s", closeErr.Error())
+		}
+	}()
+
+	w := zip.NewWriter(out)
+
+	for name, file := range p.data {
+		f, err := w.Create(name)
+		if err != nil {
+			log.Fatal(err)
+		}
+		_, err = f.Write(file)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	err = w.Close()
+	if err != nil {
+		log.Fatal(err)
 	}
 }
