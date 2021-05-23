@@ -23,7 +23,8 @@ go run parser.go
 
 #### Envs
 Envs have precedence over command line args
-* **SITE** - (Required) URL of site with sitemal.xml, for example, https://alextech18.blogspot.com
+* **SITE** - (Required) URL of site with sitemal.xml, for example, https://alextech18.blogspot.com. 
+  Also, can process list of urls, separated by commas, for example, https://alextech18.blogspot.com,https://alextoolsblog.blogspot.com
 * **BACKUP_PATH** - (Optional) path for backuping loaded website pages, for example, /home/A1esandr/backups
 
 #### Command line args

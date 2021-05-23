@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"sort"
@@ -22,8 +23,7 @@ import (
 
 type (
 	Parser struct {
-		backupPath string
-		data       map[string][]byte
+		data map[string][]byte
 	}
 
 	URLSet struct {
@@ -69,25 +69,35 @@ func (p *Parser) Parse() {
 	if len(url) == 0 {
 		log.Fatal("no site url found")
 	}
-	if !(strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://")) {
-		log.Fatal("site url must starts from http:// or https://")
-	}
 
 	backupPath := os.Getenv("BACKUP_PATH")
 	if len(backupPath) == 0 {
 		backupPath = *path
 	}
 
-	if len(backupPath) > 0 {
-		configurator := pth.NewPathConfigurator()
-		p.backupPath = configurator.Configure(backupPath, url)
+	urlList := strings.Split(url, ",")
+	for _, v := range urlList {
+		p.process(v, backupPath)
+	}
+}
+
+func (p *Parser) process(url, baseBackupPath string) {
+	if !(strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://")) {
+		log.Fatal("site url must starts from http:// or https:// for", url)
 	}
 
+	var backupPath string
+	if len(baseBackupPath) > 0 {
+		configurator := pth.NewPathConfigurator()
+		backupPath = configurator.Configure(baseBackupPath, url)
+	}
+
+	baseURL := url
 	if !strings.HasSuffix(url, "/") {
 		url += "/"
 	}
 	url += "sitemap.xml"
-	data := p.get(url)
+	data := p.get(url, 0)
 	var urls []URL
 
 	if strings.Contains(string(data), "<sitemapindex") {
@@ -97,12 +107,12 @@ func (p *Parser) Parse() {
 			log.Fatalf("error parse response xml %s", err.Error())
 		}
 		for _, sitemap := range sitemapindex.Sitemap {
-			data = p.get(sitemap.Loc)
-			pageUrls := p.process(data)
+			data = p.get(sitemap.Loc, 0)
+			pageUrls := p.decode(data)
 			urls = append(urls, pageUrls...)
 		}
 	} else {
-		urls = p.process(data)
+		urls = p.decode(data)
 	}
 
 	sort.SliceStable(urls, func(i, j int) bool {
@@ -118,8 +128,8 @@ func (p *Parser) Parse() {
 		wg.Add(1)
 		go func(url string, i int) {
 			fmt.Println(url)
-			page := p.get(url)
-			p.backup(page, url)
+			page := p.get(url, 0)
+			p.backup(page, url, backupPath)
 			doc, err := html.Parse(bytes.NewReader(page))
 			if err != nil {
 				log.Fatal(err)
@@ -130,11 +140,11 @@ func (p *Parser) Parse() {
 		}(v.Loc, i)
 	}
 	wg.Wait()
-	p.archive()
+	p.archive(backupPath, baseURL)
 	p.printList(urls)
 }
 
-func (p *Parser) process(data []byte) []URL {
+func (p *Parser) decode(data []byte) []URL {
 	var urlset URLSet
 	err := xml.Unmarshal(data, &urlset)
 	if err != nil {
@@ -143,13 +153,18 @@ func (p *Parser) process(data []byte) []URL {
 	return urlset.URL
 }
 
-func (p *Parser) get(url string) []byte {
+func (p *Parser) get(url string, count int) []byte {
 	resp, err := http.Get(url)
 	if err != nil {
 		log.Fatalf("error get %s: %s", url, err.Error())
 	}
 	if resp == nil {
 		log.Fatalf("nil response from %s", url)
+	}
+	if resp.StatusCode != http.StatusOK && count < 3 {
+		log.Println("Error loading", url)
+		time.Sleep(time.Duration(300+rand.Intn(1000)) * time.Millisecond)
+		return p.get(url, count+1)
 	}
 	defer func() {
 		closeErr := resp.Body.Close()
@@ -195,26 +210,29 @@ func (p *Parser) printList(urls []URL) {
 	fmt.Println(sb.String())
 }
 
-func (p *Parser) backup(file []byte, url string) {
-	if len(p.backupPath) == 0 || !strings.HasSuffix(url, ".html") {
+func (p *Parser) backup(file []byte, url, backupPath string) {
+	if len(backupPath) == 0 || !strings.HasSuffix(url, ".html") {
 		return
 	}
 	name := strings.ReplaceAll(url, "://", "")
 	name = strings.ReplaceAll(name, "/", "_")
-	err := os.WriteFile(p.backupPath+name, file, 0644)
+	err := os.WriteFile(backupPath+name, file, 0644)
 	if err != nil {
 		panic(err)
 	}
 	p.data[name] = file
 }
 
-func (p *Parser) archive() {
-	if len(p.backupPath) == 0 || len(p.data) == 0 {
+func (p *Parser) archive(backupPath, baseURL string) {
+	if len(backupPath) == 0 || len(p.data) == 0 {
 		return
 	}
+	name := strings.ReplaceAll(baseURL, "http://", "")
+	name = strings.ReplaceAll(name, "https://", "")
+	name = strings.ReplaceAll(name, "/", "_")
 	t := time.Now()
-	zipFile := t.Format("2006-01-02") + "archive.zip"
-	out, err := os.Create(p.backupPath + zipFile)
+	zipFile := t.Format("2006-01-02") + "_" + name + "_archive.zip"
+	out, err := os.Create(backupPath + zipFile)
 	if err != nil {
 		log.Fatal(err)
 	}
