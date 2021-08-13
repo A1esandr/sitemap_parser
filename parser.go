@@ -61,6 +61,13 @@ func New() *Parser {
 	return &Parser{data: make(map[string][]byte)}
 }
 
+func (p *Parser) Get(url string) []URL {
+	if len(url) == 0 {
+		log.Fatal("no site url found")
+	}
+	return p.getList(url)
+}
+
 func (p *Parser) Parse() {
 	url := os.Getenv("SITE")
 	if len(url) == 0 {
@@ -142,6 +149,59 @@ func (p *Parser) process(url, baseBackupPath string) {
 	wg.Wait()
 	p.archive(backupPath, baseURL)
 	p.printList(urls)
+}
+
+func (p *Parser) getList(url string) []URL {
+	if !(strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://")) {
+		log.Fatal("site url must starts from http:// or https:// for", url)
+	}
+	if !strings.HasSuffix(url, "/") {
+		url += "/"
+	}
+	url += "sitemap.xml"
+	data := p.get(url, 0)
+	var urls []URL
+
+	if strings.Contains(string(data), "<sitemapindex") {
+		var sitemapindex Sitemapindex
+		err := xml.Unmarshal(data, &sitemapindex)
+		if err != nil {
+			log.Fatalf("error parse response xml %s", err.Error())
+		}
+		for _, sitemap := range sitemapindex.Sitemap {
+			data = p.get(sitemap.Loc, 0)
+			pageUrls := p.decode(data)
+			urls = append(urls, pageUrls...)
+		}
+	} else {
+		urls = p.decode(data)
+	}
+
+	sort.SliceStable(urls, func(i, j int) bool {
+		return urls[i].LastMod < urls[j].LastMod
+	})
+	c := make(chan struct{}, 10)
+	for i := 0; i < 10; i++ {
+		c <- struct{}{}
+	}
+	var wg sync.WaitGroup
+	for i, v := range urls {
+		<-c
+		wg.Add(1)
+		go func(url string, i int) {
+			fmt.Println(url)
+			page := p.get(url, 0)
+			doc, err := html.Parse(bytes.NewReader(page))
+			if err != nil {
+				log.Fatal(err)
+			}
+			urls[i].Title = p.parse(doc)
+			wg.Done()
+			c <- struct{}{}
+		}(v.Loc, i)
+	}
+	wg.Wait()
+	return urls
 }
 
 func (p *Parser) decode(data []byte) []URL {
