@@ -1,4 +1,4 @@
-package main
+package parser
 
 import (
 	"archive/zip"
@@ -52,11 +52,6 @@ type (
 var site = flag.String("site", "", "URL of the site, for example, https://alextech18.blogspot.com")
 var path = flag.String("backup", "", "backup path")
 
-func main() {
-	flag.Parse()
-	New().Parse()
-}
-
 func New() *Parser {
 	return &Parser{data: make(map[string][]byte)}
 }
@@ -69,6 +64,7 @@ func (p *Parser) Get(url string) []URL {
 }
 
 func (p *Parser) Parse() {
+	flag.Parse()
 	url := os.Getenv("SITE")
 	if len(url) == 0 {
 		url = *site
