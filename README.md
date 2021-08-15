@@ -16,7 +16,7 @@ go mod tidy
 ```
 #### Run
 ```
-go run parser.go
+go run cmd/main.go
 ```
 
 ### Settings
@@ -31,9 +31,9 @@ Envs have precedence over command line args
 Command line args analized if envs are not present
 * **-site** - (Required, or existence of SITE env) URL of site with sitemal.xml, for example, 
 ```
-go run parser.go -site https://alextech18.blogspot.com
+go run cmd/main.go -site https://alextech18.blogspot.com
 ```
 * **-backup** - (Optional) path for backuping loaded website pages, for example, 
 ```
-go run parser.go -site https://alextech18.blogspot.com -backup /home/A1esandr/backups
+go run cmd/main.go -site https://alextech18.blogspot.com -backup /home/A1esandr/backups
 ```
